@@ -1,0 +1,19 @@
+# HackAIthon Bảng C — Qwen3.5-9B MCQ (91.36%)
+# PULL-AND-RUN: kéo image có sẵn từ Docker Hub rồi chạy. KHÔNG build, KHÔNG cần model local.
+#   1) Bỏ file đề vào ./data  (private_test.json hoặc private_test.csv)
+#   2) docker compose up        → tự pull image → tự chạy → ./output/pred.csv
+services:
+  solver:
+    image: karuizawa/hackaithon-bangc:guard
+    # Cần GPU NVIDIA + NVIDIA Container Toolkit. Không GPU vẫn chạy (CPU fallback, chậm).
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./data:/data:ro       # bỏ private_test.json|csv vào đây TRƯỚC khi chạy
+      - ./output:/output      # pred.csv ghi ra đây
+    restart: "no"

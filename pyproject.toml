@@ -1,0 +1,20 @@
+[project]
+name = "hackaithon-submission"
+version = "1.0.0"
+description = "HackAIthon Bảng C — pipeline MCQ tiếng Việt Qwen3.5-9B (90.7% public)"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "llama-cpp-python==0.3.30",
+    "huggingface-hub>=0.20",
+    "numpy",
+]
+
+# Wheel CUDA cu124 dựng sẵn (Windows dev). Docker Linux build từ source (xem Dockerfile).
+[[tool.uv.index]]
+name = "llama-cu124"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+llama-cpp-python = { index = "llama-cu124" }

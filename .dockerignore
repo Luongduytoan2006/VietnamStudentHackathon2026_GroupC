@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+work/
+*.md
+.git/
+.gitignore
+# data/output mount lúc chạy — KHÔNG đưa vào image:
+data/
+output/
+# models/ ĐƯỢC nhúng vào image (xem Dockerfile COPY models/) — KHÔNG ignore.
+# Chỉ loại cache tải HF nếu có:
+models/.cache/
