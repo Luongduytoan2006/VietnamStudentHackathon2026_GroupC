@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""ENTRYPOINT bản nộp — đạt 90.7% public (xem PIPELINE.md).
+"""ENTRYPOINT bản nộp (xem README.md).
 
 BTC mount /data (chứa private_test.csv|json) và /output. Chạy:
     python main.py

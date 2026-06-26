@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""[5a..5e] 5 solver nhánh + LLM verifier + judge. Theo temp.txt.
+"""[5a..5e] 5 solver nhánh + LLM verifier + judge.
 
-Triết lý: LLM KHÔNG chọn đáp án ngay; nó verify từng option / loại trừ / judge cuối.
+Triết lý: LLM không chọn đáp án ngay; nó verify từng option / loại trừ / judge cuối.
 Mọi solver trả result dict: {answer, confidence, candidate_scores, route, evidence?}.
 """
 import re
@@ -85,7 +85,7 @@ _SYS_CALC = (
 
 
 def solve_calculation(engine, item, feat, max_tokens=420, n_vote=1):
-    """CoT tính toán. n_vote=1: greedy (như v3). n_vote>1: self-consistency
+    """CoT tính toán. n_vote=1: greedy một lần. n_vote>1: self-consistency
     (chạy CoT n_vote lần temp>0, lấy đa số) — đắt hơn nhưng ổn định hơn cho toán."""
     n = len(item["choices"])
     user = (f"Bài toán:\n{item['question']}\n\nCác lựa chọn:\n{format_options(item['choices'])}\n\n"

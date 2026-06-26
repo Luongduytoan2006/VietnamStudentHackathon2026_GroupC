@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Cấu hình CHUẨN cho bản nộp (đạt 90.7% public). 1 nguồn sự thật duy nhất.
+"""Cấu hình chuẩn cho bản nộp — 1 nguồn sự thật duy nhất.
 
 Mọi tham số có thể override bằng biến môi trường (env) khi chạy Docker.
 """
@@ -21,15 +21,14 @@ QUANT_FILE = {
 }
 
 # ============================================================================
-# BỘ CẤU HÌNH CHUẨN — 90.7% + HARM-GUARD = 91.36% trên public 463 câu (xem PIPELINE.md)
-# CHỈ 1 model: Qwen3.5-9B GGUF. KHÔNG dùng embedding/RAG (đã bỏ bge-m3).
+# BỘ CẤU HÌNH CHUẨN — chỉ 1 model Qwen3.5-9B GGUF, không dùng embedding/RAG.
 # ============================================================================
-DEFAULT_QUANT = os.environ.get("QUANT", "Q5")            # Q5_K_M ~6.6GB: cân bằng acc/tốc độ tốt nhất
-DEFAULT_NCTX = int(os.environ.get("N_CTX", "6144"))      # đủ chứa câu hỏi dài + reasoning toán ~2000 token
-CALC_MAXTOK = int(os.environ.get("CALC_MAXTOK", "2000"))  # CHÌA KHÓA: cho toán viết HẾT bài giải (cụt = sai)
-CALC_VOTE = int(os.environ.get("CALC_VOTE", "1"))        # 1 = greedy (vote>1 phản tác dụng, đã chứng minh)
+DEFAULT_QUANT = os.environ.get("QUANT", "Q5")            # Q5_K_M ~6.6GB: cân bằng acc/tốc độ
+DEFAULT_NCTX = int(os.environ.get("N_CTX", "6144"))      # đủ chứa câu hỏi dài + lời giải toán
+CALC_MAXTOK = int(os.environ.get("CALC_MAXTOK", "2000"))  # đủ token cho toán viết hết bài giải
+CALC_VOTE = int(os.environ.get("CALC_VOTE", "1"))        # 1 = greedy; >1 = self-consistency
 PIPELINE_MODE = os.environ.get("MODE", "hybrid")         # hybrid: calc+safety dùng solver, còn lại grammar đọc thẳng
-HARM_GUARD = os.environ.get("HARM_GUARD", "1") == "1"    # GUARD câu xui phá hoại + option từ chối → refusal (+3, phá 0)
+HARM_GUARD = os.environ.get("HARM_GUARD", "1") == "1"    # câu ý đồ xấu + option từ chối → chọn option từ chối
 
 # ---- Mount theo thể lệ BTC (Docker đọc /data, ghi /output) ----
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
@@ -42,13 +41,13 @@ def model_path(quant=None):
 
 
 def ensure_model(quant=None):
-    """Đảm bảo có file model; thiếu thì tải từ HF. Tìm cả ../final_code/models để khỏi tải lại."""
+    """Đảm bảo có file model; thiếu thì tải từ HF."""
     quant = quant or DEFAULT_QUANT
     fname = QUANT_FILE[quant]
     p = os.path.join(MODELS_DIR, fname)
     if os.path.exists(p) and os.path.getsize(p) > 1_000_000_000:
         return p
-    # thử mượn từ final_code/models (phòng thí nghiệm) để khỏi tải lại
+    # khi chạy local: thử mượn model từ ../final_code/models để khỏi tải lại
     lab = os.path.join(os.path.dirname(HERE), "final_code", "models", fname)
     if os.path.exists(lab) and os.path.getsize(lab) > 1_000_000_000:
         return lab

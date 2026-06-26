@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Orchestrator pipeline v2: ghép [1]→[9]. solve_one(engine, item) → answer letter.
+"""Orchestrator pipeline: ghép [1]→[9]. solve_one(engine, item) → answer letter.
 
 [1] parse → [2][3] features+route → [4] router → [5x] solver →
 [6] scores → [7] confidence gate (+self-check) → [8] final → (caller ghi [9]).
@@ -10,12 +10,12 @@ from . import solvers
 from .extract import extract_answer
 from .io_utils import make_labels
 
-# Cấu hình calc đọc từ env (mặc định = bộ chuẩn 90.7%: CALC_MAXTOK=2000).
-# CALC_MAXTOK: cho toán viết HẾT bài giải. 420 gây cụt reasoning -> đoán mò sai. 2000 -> calc 64%->96%.
-# CALC_VOTE: 1=greedy. vote>1 (temp cao) đã CHỨNG MINH phản tác dụng (reasoning dài hơn -> cụt nhiều hơn).
+# Cấu hình calc đọc từ env.
+# CALC_MAXTOK: số token tối đa cho lời giải toán; cần đủ lớn để model viết hết bài giải.
+# CALC_VOTE: 1 = giải greedy một lần; >1 = self-consistency (chạy nhiều lần lấy đa số).
 _CALC_VOTE = int(os.environ.get("CALC_VOTE", "1"))
 _CALC_MAXTOK = int(os.environ.get("CALC_MAXTOK", "2000"))
-# [GUARD] câu xui phá hoại + có option từ chối → chọn refusal (mặc định BẬT; đo offline: +3, phá 0).
+# [GUARD] câu có ý đồ xấu + có sẵn option từ chối → chọn option từ chối. Bật mặc định.
 _HARM_GUARD = os.environ.get("HARM_GUARD", "1") == "1"
 
 _DISPATCH = {
@@ -26,9 +26,8 @@ _DISPATCH = {
     "general_knowledge": solvers.solve_general,
 }
 
-# v3 HYBRID: chỉ các route trong set này dùng solver chuyên biệt; còn lại dùng grammar đọc-thẳng.
-# Căn cứ đo Q5 (so pred_final, per-route): calc CoT +5; reading RAG -14; general/legal hòa.
-# → chỉ calculation (+safety rule) đáng, phần còn lại grammar thắng.
+# HYBRID: chỉ các route trong set này dùng solver chuyên biệt; còn lại dùng grammar đọc-thẳng.
+# calculation cần CoT để tính, safety cần rule từ chối; các route khác grammar đọc-thẳng đạt tốt hơn.
 _HYBRID_SOLVER_ROUTES = {"calculation", "safety"}
 
 
@@ -58,12 +57,12 @@ def _self_check(engine, item, feat, result):
 
 
 def solve_one(engine, item, do_self_check=True, mode="hybrid"):
-    """mode='full' = v2 (mọi route dùng solver chuyên biệt).
-       mode='hybrid' = v3 (chỉ calc+safety dùng solver, còn lại grammar đọc-thẳng) — TỐT NHẤT (78%)."""
+    """mode='full' = mọi route dùng solver chuyên biệt.
+       mode='hybrid' = chỉ calc+safety dùng solver, còn lại grammar đọc-thẳng (mặc định)."""
     feat = extract_features(item)
 
-    # [GUARD] deterministic (trước router, 0 model call): câu xui phá hoại + có option
-    # "Tôi không thể trả lời" → refusal là đáp án đúng. Đo offline 463: fix 3, phá 0.
+    # [GUARD] deterministic (trước router, không gọi model): câu có ý đồ xấu + có option
+    # "Tôi không thể trả lời" → chọn option từ chối.
     if _HARM_GUARD:
         ref_lab = harm_with_refusal(item)
         if ref_lab is not None:

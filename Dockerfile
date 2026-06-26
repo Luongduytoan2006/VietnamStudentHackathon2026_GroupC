@@ -1,4 +1,4 @@
-# HackAIthon Bảng C — Qwen3.5-9B MCQ pipeline (90.7%)
+# HackAIthon Bảng C — Qwen3.5-9B MCQ pipeline
 # Base: CUDA 12.4 runtime (khớp wheel cu124). Máy chấm cần GPU; có CPU fallback.
 FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
 

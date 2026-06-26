@@ -1,64 +1,47 @@
 # HackAIthon 2026 — Bảng C — Giải trắc nghiệm tiếng Việt (Qwen3.5-9B)
 
-Pipeline giải câu hỏi trắc nghiệm (MCQ) tiếng Việt bằng **Qwen3.5-9B** (GGUF Q5_K_M, chạy qua `llama-cpp-python` — gọi hàm **in-process**, KHÔNG qua server/port). Hợp lệ thể lệ (model ≤ 9B).
+Pipeline giải câu hỏi trắc nghiệm (MCQ) tiếng Việt bằng **Qwen3.5-9B** (GGUF Q5_K_M, chạy qua `llama-cpp-python` — gọi hàm **in-process**, KHÔNG qua server/port).
 
-- **CHỈ 1 model duy nhất** (Qwen3.5-9B). KHÔNG cần embedding, KHÔNG cần Ollama, KHÔNG cần localhost, KHÔNG cần internet lúc chạy.
 - Đọc test ở `/data`, ghi đáp án `pred.csv` (`qid,answer`) vào `/output`.
-- **Accuracy: 91.36%** trên public 463 câu (so bộ tham chiếu).
 
 ---
 
-# ⭐ HƯỚNG DẪN CHO BTC — PULL VỀ & CHẠY (3 bước)
+# 🚀 Cách chạy (3 bước)
 
-> Cách nhanh nhất: pull image có sẵn từ Docker Hub (model đã nhúng trong image, không cần tải gì thêm, không cần build).
+Bọn em đã đóng gói sẵn toàn bộ pipeline (kèm model nhúng bên trong) thành một Docker image
+và đẩy lên Docker Hub, nên BTC không phải build hay tải model — chỉ cần pull về là chạy được.
 
-### ✅ ĐIỀU KIỆN BẮT BUỘC (phải đủ thì mới chạy ra kết quả)
-1. **Máy có GPU NVIDIA** + đã cài **NVIDIA driver** + **NVIDIA Container Toolkit** (để Docker thấy GPU).
-   - Không có GPU vẫn chạy được nhưng RẤT chậm (CPU fallback) — khuyến nghị dùng GPU.
-2. **Docker** (hoặc Docker Desktop) đang chạy.
-3. **VRAM trống ≥ 7GB** (model Qwen Q5 chiếm ~6.5GB). GPU 8GB là đủ.
-4. Có **mạng để pull image lần đầu** (~12GB). Sau khi pull xong thì **chạy KHÔNG cần mạng**.
+> Image dùng CUDA nên cần máy có **GPU NVIDIA** + Docker. Cần khoảng **7GB VRAM trống**
+> (model Qwen Q5 chiếm ~6.5GB). Lần đầu cần mạng để pull image (~12GB); pull xong thì chạy không cần mạng.
 
-### 📦 BƯỚC 1 — Bỏ file test vào thư mục `data/`
+### Bước 1 — Chuẩn bị thư mục làm việc
+Lấy thư mục này về theo một trong hai cách:
+- **Clone từ GitHub:** `git clone <repo_url> && cd submission`, hoặc
+- **Tự tạo một thư mục** chứa file `docker-compose.yml` (bọn em đã để sẵn trong repo),
+  bên trong có hai thư mục con `data/` và `output/`.
+
+### Bước 2 — Bỏ đề thi vào `data/`
+Đặt file đề của BTC vào `./data`, đặt tên `private_test.json` (hoặc `private_test.csv`):
 ```bash
-# Đặt file đề của BTC vào ./data với MỘT trong các tên sau:
-#   private_test.json   hoặc   private_test.csv
-cp <file_test_cua_BTC>  ./data/private_test.json
+cp <file_đề_của_BTC>  ./data/private_test.json
 ```
-> Định dạng JSON: list các `{"qid": "...", "question": "...", "choices": ["...", "..."]}`.
-> Định dạng CSV cũng nhận (cột `qid,question,choice_a..` hoặc `qid,question,choices`).
+> JSON là list các `{"qid": "...", "question": "...", "choices": ["...", "..."]}`; định dạng CSV cũng nhận được.
 
-### ▶️ BƯỚC 2 — Chạy
+### Bước 3 — Chạy
 ```bash
-docker compose up        # tự pull image lần đầu rồi chạy; container chạy xong tự thoát
+docker compose up
 ```
-Hoặc không dùng compose:
-```bash
-docker pull karuizawa/hackaithon-bangc:guard
-docker run --gpus all \
-  -v "${PWD}/data:/data" \
-  -v "${PWD}/output:/output" \
-  karuizawa/hackaithon-bangc:guard
-```
+Lệnh này tự pull image từ Docker Hub (lần đầu) rồi chạy; container chạy xong sẽ tự thoát.
+Kết quả nằm ở **`./output/pred.csv`** (2 cột `qid,answer`).
 
-### 📄 BƯỚC 3 — Lấy kết quả
-```
-./output/pred.csv      (2 cột: qid,answer)
-```
+> Nếu không dùng compose, có thể chạy trực tiếp:
+> ```bash
+> docker run --gpus all -v "${PWD}/data:/data" -v "${PWD}/output:/output" karuizawa/hackaithon-bangc:guard
+> ```
 
-### ✔️ Dấu hiệu chạy ĐÚNG (kiểm tra để chắc có kết quả)
-- Log in ra `[main] model=Qwen3.5-9B-Q5_K_M.gguf | n_gpu_layers=-1 (gpu=True, ...)` → đã thấy GPU
-- Log chạy dần `[main] 25/.. | ..s/câu`, kết thúc bằng `[main] XONG -> /output/pred.csv (.. dòng)`.
-- File `./output/pred.csv` có đủ số dòng = số câu đề + 1 dòng header, mọi `answer` là chữ cái A..K.
-- Tốc độ tham chiếu ~5–6s/câu trên RTX 4060 8GB (toán chậm hơn, đọc/kiến thức nhanh).
-
-### ⚠️ Lỗi thường gặp
-| Hiện tượng | Nguyên nhân | Cách sửa |
-|---|---|---|
-| `could not select device driver ... gpu` | thiếu NVIDIA Container Toolkit | cài toolkit, hoặc bỏ `--gpus all` (chạy CPU, chậm) |
-| `libcuda.so.1 cannot open` | quên cờ `--gpus all` | thêm `--gpus all` vào `docker run` |
-| `n_gpu_layers=0` dù có GPU | VRAM bị process khác chiếm | giải phóng VRAM (đóng app khác) rồi chạy lại |
-| `KHÔNG tìm thấy file test` | chưa bỏ file vào `./data` | đặt `private_test.json`/`.csv` vào `./data` |
+**Biết là đã chạy xong:** log kết thúc bằng `[main] XONG -> /output/pred.csv (.. dòng)`, và file
+`./output/pred.csv` có số dòng = số câu đề + 1 dòng header, mỗi `answer` là một chữ cái A..K.
+Tốc độ tham khảo khoảng ~5–6 giây/câu trên RTX 4060 8GB.
 
 ---
 
@@ -136,25 +119,16 @@ root ::= [A-D]      # câu 4 lựa chọn → model buộc trả A/B/C/D, không
 ### Lý do từng phần (có số đo)
 | Thành phần | Lý do |
 |---|---|
-| **[2] Harm-guard đặt ĐẦU** | Rẻ nhất (rule, 0 token). Bắt sớm câu "bẫy đạo đức" (xui làm điều xấu). Baseline offline: **+3 câu, phá 0**. Vừa đúng đáp án vừa đúng hành vi an toàn. |
-| **[4] Router bằng RULE** | Phân loại chỉ cần từ khóa → 0 token, ~0ms, dễ debug, đỡ 1 lần gọi model/câu. Sai số không nằm ở router. |
-| **calc → CoT 2000 token** | Toán cần viết HẾT bài giải. Token cụt (420) khiến giải đúng vẫn bị ghi sai. Nâng 2000 → calc **59%→96%**. Đòn bẩy lớn nhất. |
-| **reading/legal/general → đọc THẲNG, KHÔNG RAG** | Đã thử RAG: cắt nhỏ đoạn làm mất câu chứa keyword. 9B đọc nguyên đoạn tốt hơn. |
-| **Hybrid (chỉ calc+safety dùng solver riêng)** | Đo per-route: chỉ calc-CoT đáng dùng solver; reading/legal/general đọc-thẳng đã thắng → nhanh + chính xác nhất. |
+| **[2] Harm-guard đặt ĐẦU** | Nhóm em phỏng đoán câu "bẫy đạo đức" (xui làm điều xấu + có sẵn option từ chối) thì option từ chối vừa đúng đáp án vừa đúng hành vi an toàn. Bắt bằng rule là rẻ nhất (0 token) nên đặt ngay đầu pipeline. |
+| **[4] Router bằng RULE** | Nhóm em cho rằng phân loại loại câu chỉ cần từ khóa → 0 token, ~0ms, dễ debug, đỡ 1 lần gọi model/câu; sai số thực tế không nằm ở khâu phân loại. |
+| **calc → CoT 2000 token** | Toán cần viết HẾT bài giải mới ra số đúng; token cụt khiến model giải đúng nhưng bị ghi nhầm đáp án. Nhóm em nới rộng token cho riêng nhánh toán → đây là nhánh cải thiện rõ nhất. |
+| **reading/legal/general → đọc THẲNG, KHÔNG RAG** | Nhóm em phỏng đoán (và quan sát thấy) việc cắt nhỏ đoạn để RAG dễ làm mất câu chứa đáp án; model 9B đọc nguyên đoạn ngắn vẫn nắm tốt hơn nên giữ đọc-thẳng. |
+| **Hybrid (chỉ calc+safety dùng solver riêng)** | Nhóm em phỏng đoán chỉ toán (cần CoT) và safety (cần rule từ chối) là đáng dùng solver chuyên biệt; các nhánh còn lại đọc-thẳng cho kết quả nhanh và chính xác hơn. |
 | **1 model, in-process** | Đề cấm localhost → gọi hàm thẳng, không server/port. Self-contained, pull về chạy ngay. |
 
-### Các hướng đã thử & BỎ (ablation trên 463 câu)
-| Cải tiến | Kết quả đo | Quyết định |
-|---|---|---|
-| PAL (viết code Python giải toán) | calc 178→169 (**−9**, đè CoT đúng, fire cả câu không thuần số) | ❌ bỏ |
-| RAG rerank (đoạn dài) | reading net **0** (fix 1 / phá 1, churn) | ❌ bỏ |
-| Committee (đảo thứ tự + loại trừ) | **−1** (lật câu đang đúng) | ❌ bỏ |
-| Self-consistency vote (temp>0) | chậm 40-145s/câu + phản tác dụng | ❌ bỏ |
-| **Harm-guard** | **+3, phá 0** | ✅ **giữ** |
-
-**Triết lý:** đốt compute ĐÚNG chỗ dễ sai nhất (toán → CoT dài), còn lại giữ đơn giản + nhanh
-(đọc thẳng + grammar ép 1 ký tự). Cải tiến nào đo ra không tăng thì BỎ — với Qwen3.5-9B, pipeline
-hybrid đã gần trần; thêm compute không tăng điểm.
+**Triết lý:** nhóm em chủ trương đốt compute ĐÚNG chỗ dễ sai nhất (toán → CoT dài), còn các
+nhánh khác giữ đơn giản + nhanh (đọc thẳng + grammar ép 1 ký tự). Với Qwen3.5-9B, đây là điểm
+cân bằng mà nhóm phỏng đoán cho độ chính xác cao nhất trên tốc độ chấp nhận được.
 
 ### Kết quả per-route (public 463 câu)
 - calculation: 96% (178/185)
@@ -174,7 +148,7 @@ hybrid đã gần trần; thêm compute không tăng điểm.
 | `N_CTX` | `6144` | Context window (đủ câu dài + reasoning toán) |
 | `CALC_MAXTOK` | `2000` | Token tối đa reasoning toán — **đừng hạ** (cụt = sai) |
 | `MODE` | `hybrid` | calc+safety dùng solver, còn lại grammar đọc-thẳng |
-| `HARM_GUARD` | `1` | Câu xui phá hoại + có lựa chọn "Tôi không thể trả lời" → chọn từ chối (+3 câu, 0 rủi ro) |
+| `HARM_GUARD` | `1` | Câu xui phá hoại + có lựa chọn "Tôi không thể trả lời" → chọn từ chối |
 
 ### Model (đã nhúng sẵn trong image)
 | File | Kích thước | Nguồn HF |
@@ -205,10 +179,7 @@ submission/
   Dockerfile           # build image (nhúng model vào)
   docker-compose.yml   # PULL-AND-RUN: kéo image từ Hub rồi chạy (không build)
   pyproject.toml       # deps cho dev (llama-cpp-python, hf-hub, numpy)
-  README.md            # file này
-  PIPELINE.md          # chi tiết pipeline (rút gọn từ phần "Pipeline" ở trên)
+  README.md            # file này (sơ đồ pipeline + lý do thiết kế đầy đủ ở trên)
   .dockerignore        # loại data/output/md khỏi build context
   .gitignore           # chặn model + output + log khỏi GitHub
 ```
-
-Chi tiết luồng xử lý từng bước và lý do thiết kế: xem [PIPELINE.md](PIPELINE.md) (rút gọn từ phần Pipeline ở trên).

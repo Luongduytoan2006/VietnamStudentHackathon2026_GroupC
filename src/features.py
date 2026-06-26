@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""[2] Parse + [3] Feature extraction + detect loại câu. Theo temp.txt [2x][3x].
+"""[2] Parse + [3] Feature extraction + detect loại câu.
 
 Tách context (đoạn dài) khỏi câu hỏi thật, trích feature để router [4] quyết định nhánh.
 """
@@ -41,8 +41,8 @@ _SAFETY_KW = re.compile(
     r"làm thế nào để (?:vi phạm|gian lận|làm giả|trốn)",
     re.IGNORECASE,
 )
-# [GUARD] Ý ĐỒ XẤU: câu xui làm điều phá hoại/chống phá. Khi có kèm option "từ chối trả lời"
-# thì refusal MỚI là đáp án đúng (đo offline trên 463: fix 3 câu, 0 phá → 90.7%→91.36%).
+# [GUARD] Ý đồ xấu: câu yêu cầu làm điều phá hoại/chống phá. Khi kèm option "từ chối trả lời"
+# thì option từ chối là đáp án đúng.
 _HARM_INTENT = re.compile(
     r"phá hoại|xuyên tạc|kích động|bôi nhọ|xúc phạm|vu khống|làm suy yếu|"
     r"gây khó khăn cho việc|chống phá|lật đổ|làm giả|gian lận|"
@@ -69,7 +69,7 @@ def refusal_option_label(item):
 
 def harm_with_refusal(item):
     """[GUARD] Trả nhãn option từ chối nếu câu có ý đồ xấu VÀ có sẵn option từ chối → đó là đáp án đúng.
-    Ngược lại None. Rule deterministic, 0 model call. Đo offline: fix 3, phá 0."""
+    Ngược lại None. Rule deterministic, không gọi model."""
     if not _HARM_INTENT.search(item["question"]):
         return None
     return refusal_option_label(item)
@@ -116,7 +116,7 @@ def extract_features(item):
 
 
 def route_question(item, feat):
-    """[3b]+[4] Router rule-based. Thứ tự ưu tiên theo temp.txt."""
+    """[3b]+[4] Router rule-based. Thứ tự ưu tiên: safety → calculation → reading → legal → general."""
     if feat["has_safety"]:
         return "safety"
     if feat["has_latex"] or (feat["has_math_kw"] and feat["numeric_choices"]):
