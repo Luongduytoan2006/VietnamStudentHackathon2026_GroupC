@@ -1,7 +1,7 @@
 [project]
 name = "hackaithon-submission"
 version = "1.0.0"
-description = "HackAIthon Bảng C — pipeline MCQ tiếng Việt Qwen3.5-9B"
+description = "HackAIthon Bảng C — pipeline MCQ tiếng Việt Qwen3.5-4B"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

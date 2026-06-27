@@ -1,185 +1,163 @@
-# HackAIthon 2026 — Bảng C — Giải trắc nghiệm tiếng Việt (Qwen3.5-9B)
+# HackAIthon 2026 — Bảng C — Giải trắc nghiệm tiếng Việt (Qwen3.5-4B)
 
-Pipeline giải câu hỏi trắc nghiệm (MCQ) tiếng Việt bằng **Qwen3.5-9B** (GGUF Q5_K_M, chạy qua `llama-cpp-python` — gọi hàm **in-process**, KHÔNG qua server/port).
+Pipeline giải câu hỏi trắc nghiệm (MCQ) tiếng Việt bằng LLM **Qwen3.5-4B** (GGUF Q8_0). Hệ thống chạy qua `llama-cpp-python` (gọi hàm in-process, **KHÔNG** qua server/port/API ngoài). Model có kích thước ≤ 5B tham số, tuân thủ tuyệt đối giới hạn của thể lệ Bảng C.
 
-- Đọc test ở `/data`, ghi đáp án `pred.csv` (`qid,answer`) vào `/output`.
+## 🌟 Điểm nổi bật
+- **Entry-point**: `predict.py` (thực thi qua script `inference.sh`).
+- **Đầu vào**: Đọc dữ liệu từ `/code/private_test.json` (thư mục BTC mount vào khi chấm).
+- **Đầu ra**: Ghi kết quả `submission.csv` (qid, answer) và `submission_time.csv` (qid, answer, time) trực tiếp vào `/code`.
+- **Độc lập & Tối ưu**: Sử dụng một model LLM duy nhất, không dùng embedding/RAG, không yêu cầu kết nối internet lúc suy luận (inference).
 
 ---
 
-# 🚀 Cách chạy (3 bước)
+## 🚀 Hướng dẫn chạy (Chuẩn quy trình chấm của BTC)
 
-Bọn em đã đóng gói sẵn toàn bộ pipeline (kèm model nhúng bên trong) thành một Docker image
-và đẩy lên Docker Hub, nên BTC không phải build hay tải model — chỉ cần pull về là chạy được.
+> **Lưu ý**: Image sử dụng CUDA nên yêu cầu máy tính có GPU NVIDIA và đã cài đặt Docker (NVIDIA Container Toolkit). Cần khoảng **5GB VRAM trống** (model 4B Q8 chiếm ~4.3GB). Lần đầu chạy cần internet để pull image, các lần sau hoàn toàn có thể chạy offline.
 
-> Image dùng CUDA nên cần máy có **GPU NVIDIA** + Docker. Cần khoảng **7GB VRAM trống**
-> (model Qwen Q5 chiếm ~6.5GB). Lần đầu cần mạng để pull image (~12GB); pull xong thì chạy không cần mạng.
-
-### Bước 1 — Chuẩn bị thư mục làm việc
-Lấy thư mục này về theo một trong hai cách:
-- **Clone từ GitHub:** `git clone <repo_url> && cd submission`, hoặc
-- **Tự tạo một thư mục** chứa file `docker-compose.yml` (bọn em đã để sẵn trong repo),
-  bên trong có hai thư mục con `data/` và `output/`.
-
-### Bước 2 — Bỏ đề thi vào `data/`
-Đặt file đề của BTC vào `./data`, đặt tên `private_test.json` (hoặc `private_test.csv`):
+### Bước 1: Pull image từ Docker Hub
 ```bash
-cp <file_đề_của_BTC>  ./data/private_test.json
+docker pull karuizawa/hackaithon-bangc:final
 ```
-> JSON là list các `{"qid": "...", "question": "...", "choices": ["...", "..."]}`; định dạng CSV cũng nhận được.
 
-### Bước 3 — Chạy
+### Bước 2: Chạy & Mount thư mục dữ liệu
+Đặt file `private_test.json` vào một thư mục trên máy (ví dụ `./data`), sau đó chạy lệnh:
 ```bash
-docker compose up
+docker run --gpus all -v /đường_dẫn/tới/thư_mục_data:/code karuizawa/hackaithon-bangc:final
 ```
-Lệnh này tự pull image từ Docker Hub (lần đầu) rồi chạy; container chạy xong sẽ tự thoát.
-Kết quả nằm ở **`./output/pred.csv`** (2 cột `qid,answer`).
+*Container sẽ tự động thực thi `inference.sh` → `predict.py`: đọc dữ liệu `/code/private_test.json`, giải quyết từng câu hỏi và ghi kết quả trở lại `/code`.*
 
-> Nếu không dùng compose, có thể chạy trực tiếp:
-> ```bash
-> docker run --gpus all -v "${PWD}/data:/data" -v "${PWD}/output:/output" karuizawa/hackaithon-bangc:guard
-> ```
+### Bước 3: Nhận kết quả
+Hai file sẽ được tạo ra ngay trong thư mục bạn đã mount:
+- `submission.csv`: Chứa thông tin kết quả dưới dạng `qid, answer`.
+- `submission_time.csv`: Chứa thông tin `qid, answer, time` (thời gian inference của từng câu - tính bằng giây).
 
-**Biết là đã chạy xong:** log kết thúc bằng `[main] XONG -> /output/pred.csv (.. dòng)`, và file
-`./output/pred.csv` có số dòng = số câu đề + 1 dòng header, mỗi `answer` là một chữ cái A..K.
-Tốc độ tham khảo khoảng ~5–6 giây/câu trên RTX 4060 8GB.
+**Dấu hiệu chạy thành công**: 
+- Trong log hiển thị `[predict] model=Qwen3.5-4B-Q8_0.gguf | n_gpu_layers=-1 (gpu=True...)` (hệ thống đã nhận diện được GPU).
+- Log kết thúc bằng dòng `[predict] XONG (... câu ...)`. 
+- Tốc độ tham khảo: **~4–6 giây/câu** (được đo đạc trên card đồ họa RTX 4060 8GB).
 
 ---
 
-# 🔧 Build lại từ source (cho người dev, KHÔNG cần cho BTC)
+## 📊 Pipeline Flow — Sơ đồ xử lý 1 câu hỏi
 
-Folder này cũng là source đầy đủ để build lại image:
-```bash
-git clone <repo_url> && cd submission
-# Đặt model vào ./models trước khi build (model không lên GitHub vì >100MB)
-# Tải tay: python -c "import config; config.ensure_model('Q5')"
-docker build -t karuizawa/hackaithon-bangc:guard .
-docker push karuizawa/hackaithon-bangc:guard
+```mermaid
+graph TD
+    A("[1] INPUT {qid, question, choices[]}") --> B{"[2] HARM-GUARD<br>(Rule, 0 gọi model)"}
+    B -- Có ý đồ xấu & có option từ chối --> C("[Chọn option TỪ CHỐI]")
+    B -- Bình thường --> D("[3] FEATURE EXTRACTION<br>(Rule, 0 gọi model)")
+    
+    D --> E{"[4] ROUTER<br>(Rule - Theo ưu tiên)"}
+    
+    E -- has_safety --> F1("[5] SOLVER: Safety<br>Quét keyword -> grammar")
+    E -- has_latex OR (math_kw + số) --> F2("[5] SOLVER: Calculation<br>CoT max_tokens=2000 -> Gọi LLM")
+    E -- has_context --> F3("[5] SOLVER: Reading<br>Đọc thẳng -> grammar 1 ký tự")
+    E -- has_legal --> F4("[5] SOLVER: Legal<br>Đọc thẳng -> grammar 1 ký tự -> Gọi LLM")
+    E -- else --> F5("[5] SOLVER: General<br>Đọc thẳng -> grammar 1 ký tự -> Gọi LLM")
+    
+    F1 --> G("[6] VALIDATE<br>Ép answer ∈ {A..n}")
+    F2 --> G
+    F3 --> G
+    F4 --> G
+    F5 --> G
+    
+    G --> H("[7] OUTPUT<br>Ghi submission.csv & submission_time.csv")
 ```
 
-Hoặc chạy thẳng từ source bằng venv (Windows/Linux có GPU):
-```bash
-uv venv && uv sync
-uv pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12 nvidia-cuda-nvrtc-cu12  # Windows
-python -c "import config; config.ensure_model('Q5')"      # tải Qwen Q5 (~6.6GB)
-DATA_DIR=. OUTPUT_DIR=. python main.py --test data/public_test.json --out output/pred.csv
+### 🎯 Kỹ thuật "Grammar ép 1 ký tự" (GBNF)
+Thay vì để LLM tự do sinh văn bản rồi dùng Regex trích xuất, hệ thống áp dụng kỹ thuật ép LLM **CHỈ xuất đúng 1 chữ cái hợp lệ**:
+```text
+root ::= [A-D]  # VD: câu có 4 lựa chọn, LLM buộc phải trả về A hoặc B hoặc C hoặc D
 ```
+*Lợi ích*: Không sinh rác, độ trễ sinh text cực thấp (chỉ mất 1 token), độ chính xác tuyệt đối trong khâu trích xuất đáp án. Nhãn đáp án (A-K) có thể tự động co giãn theo số lượng lựa chọn của đề.
 
 ---
 
-# 📊 PIPELINE — Sơ đồ xử lý 1 câu hỏi
+## 🗂️ Xử lý dữ liệu (Data Processing)
 
-```
-[1] INPUT {qid, question, choices[]}          (nhãn động A..K, không giả định 4 lựa chọn)
-        │
-        ▼
-[2] HARM-GUARD  ◄── rule thuần, 0 gọi model
-        │  Câu có ý đồ XẤU (phá hoại/xuyên tạc/kích động/bôi nhọ...)
-        │  VÀ có option "Tôi không thể trả lời"?
-        ├── CÓ ──► chọn ngay option TỪ CHỐI → trả về (0.0s)
-        └── KHÔNG ─┐
-                   ▼
-[3] FEATURE (rule, 0 gọi model)
-        has_context / context_length / has_latex / has_math_kw /
-        numeric_choices / has_legal / has_safety / num_choices
-                   │
-                   ▼
-[4] ROUTER (rule, chọn 1 trong 5 nhánh — theo thứ tự ưu tiên)
-        has_safety ───────────────────► safety
-        has_latex OR (math_kw + số) ───► calculation
-        has_context ───────────────────► reading_context
-        has_legal ─────────────────────► legal_admin
-        else ──────────────────────────► general_knowledge
-                   │
-                   ▼
-[5] SOLVER theo nhánh
-        safety        → quét keyword (tuân thủ/từ chối/hợp pháp) → chọn; không rõ → grammar
-        calculation   → CoT ĐẦY ĐỦ max_tokens=2000 → "Đáp án: X"     ◄ gọi model (nặng)
-        reading       → grammar đọc-THẲNG cả đoạn → ép 1 ký tự        ◄ gọi model
-        legal         → grammar đọc-thẳng → ép 1 ký tự                ◄ gọi model
-        general       → grammar đọc-thẳng → ép 1 ký tự                ◄ gọi model
-                   │
-                   ▼
-[6] VALIDATE: ép answer ∈ {A..n}; lỗi/thiếu → "A"   (pred.csv không nhãn rác)
-                   │
-                   ▼
-[7] GHI pred.csv → qid,answer
-```
-
-### "Grammar ép 1 ký tự" (GBNF)
-Thay vì để model viết tự do rồi đoán đáp án, ép model CHỈ xuất đúng 1 chữ cái hợp lệ:
-```
-root ::= [A-D]      # câu 4 lựa chọn → model buộc trả A/B/C/D, không gì khác
-```
-→ không sinh rác, nhanh (1 token), trích đáp án chính xác 100%. Nhãn co giãn theo số lựa chọn (A-K).
+- **Đọc đề (`src/io_utils.py`)**: Nạp `private_test.json` (hỗ trợ cả định dạng `.csv`). Quản lý mảng `choices[]` linh hoạt từ A đến K (không hard-code 4 đáp án cố định).
+- **Tách ngữ cảnh (`src/features.py`)**: Phát hiện các đoạn văn bản dài (đặc trưng của dạng câu hỏi đọc hiểu) để tách biệt với câu hỏi chính.
+- **Trích đặc trưng & Định tuyến**: Nhận diện các từ khóa đặc biệt (LaTeX/Toán, Pháp luật, An toàn, Có ngữ cảnh) để điều hướng vào 1 trong 5 nhánh xử lý. Toàn bộ khâu này chạy 100% bằng Rule, giúp không tốn bất kỳ lượt gọi Model LLM nào.
+- **Trích đáp án (`src/extract.py`)**: Xử lý output nhiều tầng, ưu tiên format `"Đáp án: X"`, sau đó là chữ cái đứng riêng lẻ, và cuối cùng fallback về grammar 1 token.
+- **Đo thời gian (`predict.py`)**: Tính toán `end - start` cho từng câu và lưu vào `submission_time.csv` tuân thủ nghiêm ngặt yêu cầu đo lường thời gian inference của BTC.
+- **Validate đầu ra**: Đảm bảo kết quả luôn nằm trong phạm vi lựa chọn hợp lệ của từng câu, xử lý lỗi/thiếu bằng cách fallback về "A". Hệ thống cam kết xuất file output 100% đủ số lượng dòng yêu cầu.
 
 ---
 
-# 🧪 Quy trình phân tích & vì sao chọn vậy
+## ⚙️ Khởi tạo tài nguyên (Resource Initialization)
 
-### Lý do từng phần (có số đo)
-| Thành phần | Lý do |
-|---|---|
-| **[2] Harm-guard đặt ĐẦU** | Nhóm em phỏng đoán câu "bẫy đạo đức" (xui làm điều xấu + có sẵn option từ chối) thì option từ chối vừa đúng đáp án vừa đúng hành vi an toàn. Bắt bằng rule là rẻ nhất (0 token) nên đặt ngay đầu pipeline. |
-| **[4] Router bằng RULE** | Nhóm em cho rằng phân loại loại câu chỉ cần từ khóa → 0 token, ~0ms, dễ debug, đỡ 1 lần gọi model/câu; sai số thực tế không nằm ở khâu phân loại. |
-| **calc → CoT 2000 token** | Toán cần viết HẾT bài giải mới ra số đúng; token cụt khiến model giải đúng nhưng bị ghi nhầm đáp án. Nhóm em nới rộng token cho riêng nhánh toán → đây là nhánh cải thiện rõ nhất. |
-| **reading/legal/general → đọc THẲNG, KHÔNG RAG** | Nhóm em phỏng đoán (và quan sát thấy) việc cắt nhỏ đoạn để RAG dễ làm mất câu chứa đáp án; model 9B đọc nguyên đoạn ngắn vẫn nắm tốt hơn nên giữ đọc-thẳng. |
-| **Hybrid (chỉ calc+safety dùng solver riêng)** | Nhóm em phỏng đoán chỉ toán (cần CoT) và safety (cần rule từ chối) là đáng dùng solver chuyên biệt; các nhánh còn lại đọc-thẳng cho kết quả nhanh và chính xác hơn. |
-| **1 model, in-process** | Đề cấm localhost → gọi hàm thẳng, không server/port. Self-contained, pull về chạy ngay. |
-
-**Triết lý:** nhóm em chủ trương đốt compute ĐÚNG chỗ dễ sai nhất (toán → CoT dài), còn các
-nhánh khác giữ đơn giản + nhanh (đọc thẳng + grammar ép 1 ký tự). Với Qwen3.5-9B, đây là điểm
-cân bằng mà nhóm phỏng đoán cho độ chính xác cao nhất trên tốc độ chấp nhận được.
-
-### Kết quả per-route (public 463 câu)
-- calculation: 96% (178/185)
-- reading_context: 95% (73/77)
-- general_knowledge: 85% (146/172)
-- legal_admin: 79% (22/28)
-- safety: 100% (1/1)
-- **Tổng: 423/463 = 91.36%**
+- **Model LLM**: Qwen3.5-4B GGUF Q8_0 (~4.3GB), lấy từ repo `unsloth/Qwen3.5-4B-GGUF`. Model đã được đóng gói sẵn trong Docker image tại `/app/models/` (BTC chỉ cần pull image về là chạy ngay, không cần download tải thêm).
+- **Vector Database/RAG**: Hoàn toàn **KHÔNG SỬ DỤNG**. Pipeline tinh gọn tối đa với 1 LLM duy nhất chạy in-process bằng `llama-cpp-python`.
+- **Tương thích CUDA rộng rãi**: Docker image khởi tạo từ base image `nvidia/cuda:12.8.0-devel-ubuntu22.04` và build thư viện `llama-cpp-python` với flag `CMAKE_CUDA_ARCHITECTURES=89;120` để tương thích linh hoạt trên nhiều dòng card, từ RTX 40xx đến kiến trúc Blackwell (RTX 50xx).
 
 ---
 
-# ⚙️ Cấu hình (đã set sẵn mức CHUẨN, không cần đổi)
+## 🧪 Thiết kế hệ thống: Tư duy Tối ưu hoá
 
-| Env | Default | Ý nghĩa |
-|---|---|---|
-| `QUANT` | `Q5` | Quant Qwen: Q4/Q5/Q6/Q8. Q5_K_M cân bằng acc/tốc độ |
-| `N_CTX` | `6144` | Context window (đủ câu dài + reasoning toán) |
-| `CALC_MAXTOK` | `2000` | Token tối đa reasoning toán — **đừng hạ** (cụt = sai) |
-| `MODE` | `hybrid` | calc+safety dùng solver, còn lại grammar đọc-thẳng |
-| `HARM_GUARD` | `1` | Câu xui phá hoại + có lựa chọn "Tôi không thể trả lời" → chọn từ chối |
+| Quyết định Thiết kế | Lập luận của nhóm |
+| --- | --- |
+| **Harm-guard bằng Rule đặt đầu tiên** | Đối với dạng câu hỏi bẫy (có tuỳ chọn từ chối cung cấp thông tin), việc bắt bằng rule có chi phí rẻ nhất (0 token) và độ chính xác rất cao. |
+| **Định tuyến (Router) bằng Rule** | Phân loại câu hỏi diễn ra tức thời, dễ kiểm soát, tiết kiệm phần lớn chi phí gọi LLM. Tỉ lệ sai số ở khâu phân loại là rất thấp so với lợi ích mang lại. |
+| **Nhánh Toán -> Chain-of-Thought (CoT)** | Giải Toán học luôn bắt buộc LLM phải suy luận (CoT). Việc tăng giới hạn max token lên `2000 tokens` đảm bảo LLM không bị ngắt quãng logic giữa chừng khi giải các bài toán dài. |
+| **Nhánh Đọc hiểu/Pháp luật -> Đọc thẳng** | Qua thử nghiệm và quan sát, áp dụng mô hình RAG dễ làm mất đi context chứa đáp án chính xác. Cho LLM đọc trọn vẹn ngữ cảnh một lần đảm bảo giữ nguyên tính logic của câu và cho ra hiệu năng tốt hơn. |
+| **Xử lý Hybrid (Chỉ Calc + Safety dùng solver riêng)** | Nhóm phỏng đoán chỉ Toán học (cần CoT) và bài toán Safety (cần rule từ chối) là đáng dùng solver chuyên biệt. Các nhánh còn lại áp dụng đọc thẳng và grammar (GBNF) ép sinh ra 1 token sẽ cho kết quả nhanh và chính xác nhất. |
+| **Chạy In-process 100% bằng 1 model** | Theo sát thể lệ (không gọi model hay API/Server ngoài). |
 
-### Model (đã nhúng sẵn trong image)
-| File | Kích thước | Nguồn HF |
-|---|---|---|
-| `Qwen3.5-9B-Q5_K_M.gguf` | ~6.6GB | `unsloth/Qwen3.5-9B-GGUF` |
-
-> Không cần model embedding. Pipeline chỉ dùng 1 model LLM.
+> **Triết lý của nhóm**: Dồn toàn lực "compute" vào các bài toán dễ sai (như Toán học cần CoT dài để suy luận), các bài toán còn lại ưu tiên mục tiêu nhanh - gọn - chính xác (Đọc thẳng + Grammar). Với điều kiện sử dụng model có kích thước `< 5B parameters`, hệ thống đã đạt đến điểm cân bằng tốt nhất giữa Tốc độ xử lý và Độ chính xác kết quả.
 
 ---
 
-# 📁 Cấu trúc thư mục
+## ⚙️ Cấu hình Hệ thống (Environment Variables)
+*Hệ thống đã được thiết lập sẵn ở mức tối ưu nhất, nhưng vẫn hỗ trợ ghi đè linh hoạt thông qua Environment Variables (Env)*
 
-```
+| Biến Môi Trường (Env) | Mặc định | Ý nghĩa chức năng |
+| --- | --- | --- |
+| `QUANT` | `Q8` | Mức lượng tử hoá (Quantization). Dùng mức cao nhất `Q8_0` cho model 4B để giữ chất lượng tốt nhất có thể. |
+| `N_CTX` | `6144` | Context Window - Đủ sức chứa các đoạn đọc hiểu cực kỳ dài cũng như lưu giữ chuỗi suy luận toán học. |
+| `CALC_MAXTOK` | `2000` | Số lượng tokens tối đa cho phép khi sinh lời giải toán (Khuyến cáo không nên hạ thấp). |
+| `MODE` | `hybrid` | Sử dụng solver riêng cho nhánh Toán/Safety; Đọc thẳng + grammar cho các nhánh còn lại. |
+| `HARM_GUARD` | `1` | Bật bộ chặn câu có ý đồ xấu kèm tuỳ chọn từ chối → chọn đáp án từ chối. |
+
+---
+
+## 📂 Cấu trúc Source Code
+
+```text
 submission/
-  main.py              # ENTRYPOINT: đọc /data → giải → ghi /output/pred.csv
-  config.py            # cấu hình chuẩn + tải model Qwen
-  src/
-    bootstrap.py       # preload DLL CUDA (Windows; no-op trên Linux/Docker)
-    io_utils.py        # đọc test .json/.csv, ghi pred.csv, nhãn A–K động
-    features.py        # trích đặc trưng + router 5 nhánh + HARM-GUARD
-    pipeline.py        # orchestrator solve_one (guard → router → solver → validate)
-    solvers.py         # solver theo route: calc CoT / safety / reading / legal / general
-    extract.py         # trích đáp án A–K từ output model
-    engine.py          # wrapper llama.cpp (sinh + grammar ép 1 ký tự)
-  models/              # Qwen3.5-9B-Q5_K_M.gguf  (nhúng vào image khi build; KHÔNG lên GitHub)
-  data/                # BTC bỏ private_test.json/.csv vào đây
-  output/              # pred.csv xuất ra đây
-  Dockerfile           # build image (nhúng model vào)
-  docker-compose.yml   # PULL-AND-RUN: kéo image từ Hub rồi chạy (không build)
-  pyproject.toml       # deps cho dev (llama-cpp-python, hf-hub, numpy)
-  README.md            # file này (sơ đồ pipeline + lý do thiết kế đầy đủ ở trên)
-  .dockerignore        # loại data/output/md khỏi build context
-  .gitignore           # chặn model + output + log khỏi GitHub
+├── predict.py           # ENTRY-POINT: Đọc /code/private_test.json → xuất kết quả csv
+├── inference.sh         # Script chạy tự động (cd /app && python predict.py)
+├── config.py            # Chứa các thông số cấu hình chuẩn + module tải model LLM
+├── requirements.txt     # Các thư viện phụ thuộc (llama-cpp-python, huggingface-hub, ...)
+├── Dockerfile           # Docker configuration (Base CUDA 12.8)
+├── README.md            # Tài liệu Hướng dẫn sử dụng này
+├── models/              # Nơi chứa model LLM Qwen3.5-4B-Q8_0.gguf (Nhúng sẵn trong image)
+└── src/                 # Thư mục mã nguồn logic chính
+    ├── bootstrap.py     # Preload DLL CUDA (Trên Windows, cơ chế no-op với Linux/Docker)
+    ├── io_utils.py      # Xử lý I/O, gán nhãn đáp án linh hoạt từ A-K
+    ├── features.py      # Trích xuất đặc trưng câu hỏi + Định tuyến + HARM-GUARD
+    ├── pipeline.py      # Module điều phối (Guard → Router → Solver → Validate)
+    ├── solvers.py       # Logic xử lý riêng cho từng loại câu hỏi (Calc CoT / Safety / ...)
+    ├── extract.py       # Trích xuất đáp án chữ cái cuối cùng từ output của Model
+    └── engine.py        # Wrapper bao bọc llama.cpp (Sinh text thông thường + GBNF)
+```
+
+> **Lưu ý kỹ thuật**: Mã nguồn và Model LLM được đặt toàn bộ tại thư mục `/app` trong Docker thay vì `/code`. Mục đích của kiến trúc này là để khi BTC tiến hành mount dữ liệu từ bên ngoài vào `/code`, source code của hệ thống sẽ không bị ghi đè, làm mất logic hay thay đổi cấu trúc mã nguồn. Thư mục `/code` chỉ được dành riêng cho việc Input/Output dữ liệu kiểm thử.
+
+---
+
+## 🔧 Build lại từ source (Dành riêng cho Developer)
+
+*(Quá trình này không yêu cầu đối với BTC khi chấm bài)*
+
+```bash
+# 1. Clone repository
+git clone <repo_url> && cd submission
+
+# 2. Tải model vào thư mục ./models (Do model LLM có dung lượng vượt quá giới hạn 100MB nên không đưa lên Github)
+python -c "import config; config.ensure_model('Q8')"
+
+# 3. Build Docker image
+docker build -t karuizawa/hackaithon-bangc:final .
+
+# 4. Push image lên Docker Hub (Nếu cần thiết)
+docker push karuizawa/hackaithon-bangc:final
 ```

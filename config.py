@@ -11,19 +11,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(HERE, "models")
 os.makedirs(MODELS_DIR, exist_ok=True)
 
-# ---- Model giải (Qwen3.5-9B GGUF, unsloth) ----
-HF_REPO = "unsloth/Qwen3.5-9B-GGUF"
+# ---- Model giải (Qwen3.5-4B GGUF, unsloth) — tham số ≤ 5B theo thể lệ Bảng C ----
+HF_REPO = "unsloth/Qwen3.5-4B-GGUF"
 QUANT_FILE = {
-    "Q4": "Qwen3.5-9B-Q4_K_M.gguf",
-    "Q5": "Qwen3.5-9B-Q5_K_M.gguf",
-    "Q6": "Qwen3.5-9B-Q6_K.gguf",
-    "Q8": "Qwen3.5-9B-Q8_0.gguf",
+    "Q4": "Qwen3.5-4B-Q4_K_M.gguf",
+    "Q5": "Qwen3.5-4B-Q5_K_M.gguf",
+    "Q6": "Qwen3.5-4B-Q6_K.gguf",
+    "Q8": "Qwen3.5-4B-Q8_0.gguf",
 }
 
 # ============================================================================
-# BỘ CẤU HÌNH CHUẨN — chỉ 1 model Qwen3.5-9B GGUF, không dùng embedding/RAG.
+# BỘ CẤU HÌNH CHUẨN — chỉ 1 model Qwen3.5-4B GGUF, không dùng embedding/RAG.
+# Model 4B nhỏ nên dùng quant cao nhất (Q8_0 ~4.3GB) để giữ chất lượng, vẫn vừa VRAM 8GB.
 # ============================================================================
-DEFAULT_QUANT = os.environ.get("QUANT", "Q5")            # Q5_K_M ~6.6GB: cân bằng acc/tốc độ
+DEFAULT_QUANT = os.environ.get("QUANT", "Q8")            # Q8_0 ~4.3GB: quant cao nhất cho 4B
 DEFAULT_NCTX = int(os.environ.get("N_CTX", "6144"))      # đủ chứa câu hỏi dài + lời giải toán
 CALC_MAXTOK = int(os.environ.get("CALC_MAXTOK", "2000"))  # đủ token cho toán viết hết bài giải
 CALC_VOTE = int(os.environ.get("CALC_VOTE", "1"))        # 1 = greedy; >1 = self-consistency

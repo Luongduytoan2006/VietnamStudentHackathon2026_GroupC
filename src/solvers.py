@@ -165,7 +165,7 @@ def _exact_bonus(choice, evidence):
 
 # ---------- [5d] legal_admin ----------
 _SYS_LEGAL = (
-    "Bạn là chuyên gia pháp luật và thủ tục hành chính Việt Nam. Với câu hỏi: "
+    "Bạn là chuyên gia pháp luật và thủ tục hành chính. Với câu hỏi: "
     "(1) xác định nguyên tắc/quy định liên quan; (2) loại trừ lựa chọn sai; (3) chọn đáp án đúng. "
     "Ưu tiên đáp án đúng thủ tục, hợp pháp. KHÔNG bịa số điều luật nếu không chắc. "
     "Suy luận ngắn. Kết thúc bằng đúng một dòng: 'Đáp án: X'."

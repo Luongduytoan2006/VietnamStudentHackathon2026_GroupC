@@ -1,0 +1,3 @@
+llama-cpp-python==0.3.30
+huggingface-hub>=0.20
+numpy

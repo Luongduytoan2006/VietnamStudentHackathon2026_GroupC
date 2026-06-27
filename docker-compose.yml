@@ -1,11 +1,20 @@
-# HackAIthon Bảng C — Qwen3.5-9B MCQ
-# PULL-AND-RUN: kéo image có sẵn từ Docker Hub rồi chạy. KHÔNG build, KHÔNG cần model local.
-#   1) Bỏ file đề vào ./data  (private_test.json hoặc private_test.csv)
-#   2) docker compose up        → tự pull image → tự chạy → ./output/pred.csv
+# HackAIthon Bảng C — Qwen3.5-4B MCQ (tiện ích để thí sinh TỰ TEST)
+# Model + code đã nhúng trong image. Cách test:
+#   1) Đặt private_test.json vào ./work
+#   2) docker compose up
+#   3) Lấy submission.csv + submission_time.csv trong ./work
+#
+# LƯU Ý QUAN TRỌNG:
+#   - CHỈ mount RIÊNG file private_test.json vào /code (KHÔNG mount cả thư mục đè /code,
+#     vì sẽ che mất predict.py/inference.sh/models/src đã COPY trong image).
+#   - Output mặc định ghi vào /code; ở đây set OUT_DIR=/out (mount ./work) để lấy kết quả ra host.
+#   - BTC chấm bằng: docker run -v <host>/private_test.json:/code/private_test.json <image>
+#     rồi container tự chạy inference.sh -> predict.py.
 services:
   solver:
-    image: karuizawa/hackaithon-bangc:guard
-    # Cần GPU NVIDIA + NVIDIA Container Toolkit. Không GPU vẫn chạy (CPU fallback, chậm).
+    image: karuizawa/hackaithon-bangc:final
+    environment:
+      - OUT_DIR=/out
     deploy:
       resources:
         reservations:
@@ -14,6 +23,6 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ./data:/data:ro       # bỏ private_test.json|csv vào đây TRƯỚC khi chạy
-      - ./output:/output      # pred.csv ghi ra đây
+      - ./work/private_test.json:/code/private_test.json:ro   # mount RIÊNG file đề (không clobber code)
+      - ./work:/out                                           # submission*.csv ghi ra đây
     restart: "no"
