@@ -31,11 +31,17 @@ RUN mkdir -p /code
 # INSTALL LIBRARIES
 # Build llama-cpp-python với CUDA. CMAKE_CUDA_ARCHITECTURES gồm 89 (RTX 40xx của dev)
 # và 120 (RTX 50xx Blackwell của máy chấm BTC) để image chạy GPU được trên CẢ HAI.
+#
+# GGML_NATIVE=OFF BẮT BUỘC: mặc định llama.cpp bật -march=native, nướng cứng tập lệnh
+# CPU của MÁY BUILD (AVX-512/AVX2/FMA...) vào binary. Nếu CPU máy chấm BGK không có
+# tập lệnh đó -> "Illegal instruction (core dumped)" ngay lúc load model (kể cả khi
+# offload full GPU, vì GGML khởi tạo CPU backend trước). OFF -> build portable, runtime
+# tự dò tập lệnh; chạy GPU nên CPU chậm hơn chút không ảnh hưởng.
 # ------------------------------------------------------------
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir --upgrade pip && \
     pip3 install --no-cache-dir hf-transfer && \
-    CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=89;120" \
+    CMAKE_ARGS="-DGGML_CUDA=on -DGGML_NATIVE=OFF -DCMAKE_CUDA_ARCHITECTURES=89;120" \
         pip3 install --no-cache-dir -r requirements.txt
 
 # ------------------------------------------------------------
